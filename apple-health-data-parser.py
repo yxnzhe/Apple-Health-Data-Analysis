@@ -184,17 +184,6 @@ class HealthDataExtractor(object):
                 if 'type' in node.attrib:
                     node.attrib['type'] = abbreviate(node.attrib['type'])
 
-    # def write_records(self):
-    #     kinds = FIELDS.keys()
-    #     for node in self.nodes:
-    #         if node.tag in kinds:
-    #             attributes = node.attrib
-    #             kind = attributes['type'] if node.tag == 'Record' else node.tag
-    #             values = [format_value(attributes.get(field), datatype)
-    #                       for (field, datatype) in FIELDS[node.tag].items()]
-    #             line = ','.join(values) + '\n'
-    #             self.handles[kind].write(line)
-
     def write_records(self):
         kinds = FIELDS.keys()
         for node in self.nodes:
