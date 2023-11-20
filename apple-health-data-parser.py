@@ -107,7 +107,7 @@ class HealthDataExtractor(object):
         self.in_path = path
         self.verbose = verbose
         self.directory = os.path.abspath(os.path.split(path)[0])
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             self.report('Reading data from %s . . . ' % path, end='')
             self.data = ElementTree.parse(f)
             self.report('done')
@@ -147,13 +147,17 @@ class HealthDataExtractor(object):
         self.other_types = Counter()
         for record in self.nodes:
             if record.tag == 'Record':
-                self.record_types[record.attrib['type']] += 1
+                if 'type' in record.attrib:
+                    self.record_types[record.attrib['type']] += 1
+                else:
+                    self.report('Record node without type attribute. Skipping...')
             elif record.tag in ('ActivitySummary', 'Workout'):
                 self.other_types[record.tag] += 1
-            elif record.tag in ('Export', 'Me'):
-                pass
+            elif record.tag in ('Export', 'Me', 'ExportDate'):
+                pass 
             else:
                 self.report('Unexpected node of type %s.' % record.tag)
+
 
     def collect_stats(self):
         self.count_record_types()
@@ -164,7 +168,7 @@ class HealthDataExtractor(object):
         self.paths = []
         for kind in (list(self.record_types) + list(self.other_types)):
             path = os.path.join(self.directory, '%s.csv' % abbreviate(kind))
-            f = open(path, 'w')
+            f = open(path, 'w', encoding='utf-8')
             headerType = (kind if kind in ('Workout', 'ActivitySummary')
                                else 'Record')
             f.write(','.join(FIELDS[headerType].keys()) + '\n')
@@ -180,6 +184,17 @@ class HealthDataExtractor(object):
                 if 'type' in node.attrib:
                     node.attrib['type'] = abbreviate(node.attrib['type'])
 
+    # def write_records(self):
+    #     kinds = FIELDS.keys()
+    #     for node in self.nodes:
+    #         if node.tag in kinds:
+    #             attributes = node.attrib
+    #             kind = attributes['type'] if node.tag == 'Record' else node.tag
+    #             values = [format_value(attributes.get(field), datatype)
+    #                       for (field, datatype) in FIELDS[node.tag].items()]
+    #             line = ','.join(values) + '\n'
+    #             self.handles[kind].write(line)
+
     def write_records(self):
         kinds = FIELDS.keys()
         for node in self.nodes:
@@ -187,9 +202,16 @@ class HealthDataExtractor(object):
                 attributes = node.attrib
                 kind = attributes['type'] if node.tag == 'Record' else node.tag
                 values = [format_value(attributes.get(field), datatype)
-                          for (field, datatype) in FIELDS[node.tag].items()]
+                        for (field, datatype) in FIELDS[node.tag].items()]
                 line = ','.join(values) + '\n'
-                self.handles[kind].write(line)
+
+                if hasattr(self.handles[kind], 'write'):
+                    self.handles[kind].write(line)
+                else:
+                    with open(self.handles[kind], 'a', encoding='utf-8') as f:  # Specify utf-8 encoding
+                        f.write(line)
+            else:
+                print(f"Unexpected node of type {node.tag}. Skipping...".encode('utf-8', 'ignore').decode('utf-8'))
 
     def close_files(self):
         for (kind, f) in self.handles.items():
